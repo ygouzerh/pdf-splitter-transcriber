@@ -29,3 +29,27 @@ just split-transcribe <path/to/file.pdf> [concurrency]
 See the individual READMEs for details:
 - pdf-splitter: `pdf-splitter/README.md`
 - pdf-transcriber: `pdf-transcriber/README.md`
+
+## Notes: how to transform everything into pdf
+
+### Generate one pdf per lesson
+
+```
+for f in *.txt; do
+  paps --paper=a4 --font="Noto Sans CJK SC 11" "$f" | ps2pdf - "${f%.txt}.pdf"
+done
+```
+
+### Generate a single pdf
+
+From inside the folder:
+
+```
+for f in *.txt; do
+  echo "$f"
+  echo "----------------"
+  cat "$f"
+  echo -e "\f"   # form feed = new page
+done \
+| paps --font="Noto Sans CJK SC 11" | ps2pdf - output.pdf
+```
