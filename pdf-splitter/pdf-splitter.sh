@@ -9,8 +9,8 @@ set -euo pipefail
 # For the last section, if an end pattern is provided, it uses [lastStart, endMatch),
 # otherwise [lastStart, lastPage+1).
 #
-# Searches happen on an OCR'd temporary PDF (unless --no-ocr), but splitting is done
-# from the original input to preserve quality.
+# Searches and splitting happen on an OCR'd temporary PDF (unless --no-ocr).
+# Falls back to the original input if OCR is disabled or fails.
 
 DEFAULT_START_PATTERN='Choose the right picture for each dialogue you hear'
 DEFAULT_END_PATTERN='HSK Model Test'
@@ -31,6 +31,7 @@ Behavior:
 	- Ranges are half-open: start inclusive, end exclusive.
 	- Output PDFs are 1.pdf, 2.pdf, ... under output/<input-basename>/
 	- Uses qpdf to split and pdfgrep to locate pages.
+	- When OCR is enabled, both search and splitting use the OCR'd PDF; otherwise the original is used.
 
 Examples:
 	$(basename "$0") input.pdf
@@ -85,8 +86,9 @@ name_no_ext=${base_name%.*}
 out_dir="output/$name_no_ext"
 mkdir -p "$out_dir"
 
-# Prepare searchable PDF
+# Prepare source PDFs
 search_pdf="$INPUT"
+split_pdf="$INPUT"
 tmp_ocr=""
 cleanup() {
 	if [[ -n "$tmp_ocr" && -f "$tmp_ocr" ]]; then rm -f "$tmp_ocr"; fi
@@ -98,12 +100,13 @@ if [[ $use_ocr -eq 1 ]]; then
 	tmp_ocr=$(mktemp "${TMPDIR:-/tmp}/pdf-splitter-ocr-XXXXXX.pdf")
 	echo "[info] OCR'ing for search: $INPUT -> $tmp_ocr" >&2
 	# Use default ocrmypdf settings; rely on auto-detection
-	ocrmypdf "$INPUT" "$tmp_ocr" >/dev/null 2>&1 || {
+	ocrmypdf -l chi_sim+eng --force-ocr "$INPUT" "$tmp_ocr" 2>&1 || {
 		echo "[warn] ocrmypdf failed; falling back to original PDF for search" >&2
 		rm -f "$tmp_ocr"; tmp_ocr=""; search_pdf="$INPUT"
 	}
 	if [[ -n "$tmp_ocr" && -f "$tmp_ocr" ]]; then
 		search_pdf="$tmp_ocr"
+		split_pdf="$tmp_ocr"
 	fi
 else
 	echo "[info] OCR disabled; searching in original PDF" >&2
@@ -117,8 +120,8 @@ if [[ ${#start_pages[@]} -eq 0 ]]; then
 	exit 3
 fi
 
-# Determine total pages via qpdf; needed if no end-pattern or not found after last start
-total_pages=$(qpdf --show-npages "$INPUT" 2>/dev/null || true)
+# Determine total pages via qpdf on the PDF we'll split; needed if no end-pattern or not found after last start
+total_pages=$(qpdf --show-npages "$split_pdf" 2>/dev/null || true)
 if ! [[ "$total_pages" =~ ^[0-9]+$ ]]; then
 	echo "Error: could not determine total pages via qpdf" >&2
 	exit 4
@@ -161,9 +164,9 @@ for (( i=0; i<${#start_pages[@]}; i++ )); do
 	fi
 
 	out_file="$out_dir/${section_index}.pdf"
-	echo "[info] Creating ${out_file} from pages ${start}-${end_incl}" >&2
+	echo "[info] Creating ${out_file} from pages ${start}-${end_incl} (source: $( [[ "$split_pdf" == "$INPUT" ]] && echo original || echo OCR ))" >&2
 	# qpdf syntax: qpdf in.pdf --pages in.pdf start-end -- out.pdf
-	qpdf "$INPUT" --pages "$INPUT" ${start}-${end_incl} -- "$out_file"
+	qpdf "$split_pdf" --pages "$split_pdf" ${start}-${end_incl} -- "$out_file"
 
 	((section_index++))
 done
