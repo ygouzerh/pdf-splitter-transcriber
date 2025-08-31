@@ -9,20 +9,21 @@ Don't includes the example or exercice statement, just focus on the line with th
 
 No need to includes starts if there is.
 
-Don't output Part I.
+Don't output Part I Listening (Part I Reading is okay)
 
 Tell the result to me, only the result, nothing else
 
 Format to use if no multi choice question ==> 
 
-# Part <number>
+# Listening / Reading (Choose between both)
+## Part <number>
 <number>: <Chinese Simplified>
   - Pinyin: 
   - Translation: 
   - Grammar:  Some quick grammar point on how it was constructed (keep it short)
 
 Format to use if multiple choice question ==>
-# Part <number>
+## Part <number>
 <number>.<letter>: <Chinese Simplified>
   - Pinyin: 
   - Translation: 
